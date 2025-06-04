@@ -4,8 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import html2pdf from 'html2pdf.js';
 
 export default function HomePage() {
-  const [theme, setTheme] = useState('light');
-  const [company, setCompany] = useState('');
+  const [theme, setTheme] = useState<'light' | 'dark'>('light'); const [company, setCompany] = useState('');
   const [client, setClient] = useState('');
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [issueDate, setIssueDate] = useState('');
@@ -13,6 +12,8 @@ export default function HomePage() {
   const [discount, setDiscount] = useState(0);
   const [taxRate, setTaxRate] = useState(0);
   const [items, setItems] = useState([{ description: '', quantity: 1, price: 0 }]);
+  const [history, setHistory] = useState<any[]>([]);
+  const [selectedHistoryIndex, setSelectedHistoryIndex] = useState<number | null>(null);
   const [dueDate, setDueDate] = useState('');
   const [notes, setNotes] = useState('');
 
@@ -37,8 +38,38 @@ export default function HomePage() {
   };
 
   useEffect(() => {
+    const saved = localStorage.getItem('invoice-theme') as 'light' | 'dark' | null;
+    const system = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    setTheme(saved || system);
+  }, []);
+
+    useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark');
+    localStorage.setItem('invoice-theme', theme);
   }, [theme]);
+
+  // Load history from local storage on mount
+  useEffect(() => {
+    const stored = localStorage.getItem('invoice-history');
+    if (stored) setHistory(JSON.parse(stored));
+  }, []);
+
+  // Save history to local storage
+  const saveToHistory = () => {
+    const invoice = {
+      company,
+      client,
+      invoiceNumber,
+      issueDate,
+      currency,
+      discount,
+      taxRate,
+      items,
+    };
+    const updated = [invoice, ...history];
+    localStorage.setItem('invoice-history', JSON.stringify(updated));
+    setHistory(updated);
+  };
 
   return (
     <main className="min-h-screen bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200 p-4">
@@ -47,7 +78,7 @@ export default function HomePage() {
           <h1 className="text-3xl font-extrabold">Free Invoice Generator</h1>
           <button
             onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-            className="text-sm px-4 py-1 border rounded hover:bg-gray-100 dark:hover:bg-gray-700"
+            className="text-sm px-3 py-1 border rounded"
           >
             {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
           </button>
@@ -137,6 +168,54 @@ export default function HomePage() {
         >
           Download Invoice PDF
         </button>
+
+        {history.length > 0 && (
+          <div className="mt-8">
+            <h2 className="text-xl font-semibold mb-2">Invoice History</h2>
+            <ul className="space-y-2">
+              {history.map((inv, idx) => (
+                <li key={idx} className="flex justify-between items-center p-2 bg-gray-200 dark:bg-gray-700 rounded">
+                  <div>
+                    <strong>{inv.invoiceNumber}</strong> - {inv.client} ({inv.issueDate})
+                  </div>
+                  <div className="space-x-2">
+                    <button
+                      onClick={() => {
+                        setCompany(inv.company);
+                        setClient(inv.client);
+                        setInvoiceNumber(inv.invoiceNumber);
+                        setIssueDate(inv.issueDate);
+                        setCurrency(inv.currency);
+                        setDiscount(inv.discount);
+                        setTaxRate(inv.taxRate);
+                        setItems(inv.items);
+                        setSelectedHistoryIndex(idx);
+                      }}
+                      className="text-blue-600 text-sm hover:underline"
+                    >
+                      Load
+                    </button>
+                    <button
+                      onClick={() => {
+                        const updated = history.filter((_, i) => i !== idx);
+                        setHistory(updated);
+                        localStorage.setItem('invoice-history', JSON.stringify(updated));
+                      }}
+                      className="text-red-600 text-sm hover:underline"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <button onClick={saveToHistory} className="w-full mt-4 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg shadow">
+          Save to Invoice History
+        </button>
+
 
         {company && (
           <section ref={previewRef} className="mt-12 p-6 bg-gray-50 dark:bg-gray-700 border rounded-xl">
